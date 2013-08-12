@@ -1,0 +1,38 @@
+body {
+	font-family: Helvetica, Arial, sans-serif;
+}
+
+p {
+	font-weight: 100;
+}
+
+body {
+	text-align: center;
+}
+
+.big {
+	font-size:96px;
+	font-weight: bold;
+}
+
+ul {
+	width: 30%;
+	margin: 0 auto;
+}
+
+#response {
+	display: none;
+}
+
+#nearby {
+	display: none;
+	margin-top: 30px;
+}
+
+#result {
+	display:none;
+}
+
+img {
+	cursor: pointer;
+}

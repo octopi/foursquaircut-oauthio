@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Do I Need A Haircut?</title>
+    <link rel="stylesheet" type="text/css" href="style.css" />
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script>
+    <script type="text/javascript" src="oauth.js"></script>
+    <script type="text/javascript" src="async.js"></script>
+</head>
+<body>
+    <h1>Do I Need A Haircut?</h1>
+    <div id="auth">
+        <p><a onclick="doAuth();"><img src="connect.png" /></a></p>
+    </div>
+    <div id="response">
+        <p class="big" id="answer">
+        	
+        </p>
+        <p id="result">
+        	Your last check-in at a hair salon was at <span id="venue"></span> at <span id="last"></span>
+        </p>
+        <div id="nearby">
+            <h2 id="nearby_header"></h2>
+            <p id="nearby_phrase"></p>
+            <ul id="results"></ul>
+        </div>        
+    </div>
+
+    <script type="text/javascript">
+    // dead-simple OAuth!
+    OAuth.initialize('XFDhoXXwUXPSmGEoJpTmyy_k-jw');
+    var doAuth = function() {
+        $('#auth').html('Loading...');
+        OAuth.popup('foursquare', authCallback);
+    };
+
+    var authCallback = function(err, result) {
+        var access_token = result.access_token,
+        limit = 250,
+        offset = 0,
+        finished = false,
+        checkin = null;
+
+        // keep making calls to Foursquare until we find a check-in we want
+        async.until(function() { return finished }, function(callback) {
+            $.get('https://api.foursquare.com/v2/users/self/checkins?limit= ' + limit + '&offset=' + offset + '&v=20130812&oauth_token=' + access_token, function(response) {
+                console.log(response);
+                var checkins = response.response.checkins.items;
+                if(checkins.length === 0) {
+                    finished = true;
+                }
+                for(var i = 0; i < checkins.length; i++) {
+                    var c = checkins[i];
+                    if(c.venue.categories[0].id === '4bf58dd8d48988d110951735') {
+                        checkin = c;
+                        finished = true;
+                        break;
+                    }
+                }
+                offset += 250;
+                limit = Math.min(250, response.response.checkins.count - offset)
+                if(limit < 0) {
+                    finished = true;
+                }
+                callback();
+            });
+        },
+        function() {            
+            // determine the text to display
+            var needed, last, venue;
+            if(checkin === null) {
+                needed = true;
+                last = 'NEVER',
+                venue = 'NOWHERE';
+            } else {
+                needed = ((new Date().getTime()/1000) - checkin.createdAt) > (86400 * 90);
+                last = checkin.createdAt
+                venue = checkin.venue.name;
+            }
+            if(!needed) {
+                $('#answer').html('NO');
+                $('#nearby_header').html('Pharmacies Nearby');
+                $('#nearby_phrase').html('Lookin\' good there. Why don\'t you drop by one of these nearby pharmacies to pick up some shampoo?');
+            } else {
+                $('#answer').html('YES');
+                $('#nearby_header').html('Salons Nearby');
+                $('#nearby_phrase').html('Looks like you need a haircut! Here are some nearby salons.')
+            }
+            $('#venue').html(venue);
+            if(last === 'NEVER') {
+                $('#last').html('NEVER');
+            } else {
+                $('#last').html(new Date(last*1000).toString());
+            }
+
+            // find nearby venues to recommend to user
+            navigator.geolocation.getCurrentPosition(function(pos) {
+                var lat = pos.coords.latitude,
+                lon = pos.coords.longitude,
+                category;
+
+                if(needed) {
+                    category = '4bf58dd8d48988d110951735'; // salans
+                } else {
+                    category = '4bf58dd8d48988d10f951735'; // pharmacies
+                }
+
+                // call foursquare again for recommendations
+                $.get('https://api.foursquare.com/v2/venues/search?ll=' + lat + ',' + lon +'&categoryId=' + category +'&v=20130812&oauth_token=' + access_token, function(nearbyResponse) {
+                    console.log(nearbyResponse);
+                    var venues = nearbyResponse.response.venues;
+                    var limit = venues.length > 10 ? 10 : venues.length;
+                    for(var i = 0; i < limit; i++) {
+                        var v = venues[i];
+                        $('#results').append('<li><a href="' + v.canonicalUrl + '">' + v.name + '</a></li>');
+                    }
+                    
+                    $('#auth').hide();
+                    $('#result').show();
+                    $('#response').show();
+                    $('#nearby').show();
+                });
+            });
+        });
+    };
+    </script>
+</body>
+</html>
